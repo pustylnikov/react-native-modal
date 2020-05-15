@@ -29,6 +29,10 @@ build/
 local.properties
 *.iml
 
+# Visual Studio Code
+#
+.vscode/
+
 # node.js
 #
 node_modules/
@@ -59,5 +63,3 @@ buck-out/
 /ios/Pods/
 
 dist/
-
-env.js
