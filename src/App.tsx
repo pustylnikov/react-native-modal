@@ -10,7 +10,7 @@ type State = {
 
 class App extends Component<Props, State> {
     state: State = {
-        visible: true,
+        visible: false,
     };
 
     render() {
@@ -27,13 +27,13 @@ class App extends Component<Props, State> {
                 </SafeAreaView>
                 <Modal
                     visible={this.state.visible}
-                    showOverlayDuration={150}
-                    showContentDuration={150}
-                    hideOverlayDuration={100}
-                    hideContentDuration={100}
+                    showOverlayDuration={500}
+                    showContentDuration={500}
+                    hideOverlayDuration={500}
+                    hideContentDuration={500}
                     showComposingType={ComposingTypes.PARALLEL}
                     showAnimationType={[AnimationTypes.SLIDE_UP]}
-                    hideAnimationType={[AnimationTypes.SLIDE_UP]}
+                    hideAnimationType={[AnimationTypes.SLIDE_DOWN]}
 
                 >
                     <View style={styles.modalContentView}>

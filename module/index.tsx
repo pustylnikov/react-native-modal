@@ -1,4 +1,4 @@
-import React, { Component, ReactNode, RefObject } from 'react';
+import React, { Component, ReactNode } from 'react';
 import {
     Animated,
     BackHandler,
@@ -9,7 +9,6 @@ import {
     StyleSheet,
     TouchableWithoutFeedback,
     View,
-    ViewComponent,
 } from 'react-native';
 
 export enum ComposingTypes {
@@ -47,10 +46,7 @@ export type ReactNativeModalProps = {
 
 type State = {
     visible: boolean
-}
-
-type AnimatedComponent = ViewComponent & {
-    _attachProps: (params?: { [key: string]: any }) => void
+    closing: boolean
 }
 
 const { width, height } = Dimensions.get('window');
@@ -79,6 +75,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      */
     state = {
         visible: this.props.visible,
+        closing: false,
     };
 
     /**
@@ -117,13 +114,6 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     _mount: boolean = false;
 
     /**
-     *
-     * @type {React.RefObject<any>}
-     * @private
-     */
-    _contentAnimatedViewRef: RefObject<AnimatedComponent> = React.createRef();
-
-    /**
      * Mount
      */
     componentDidMount() {
@@ -143,14 +133,18 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      * @param {object} nextState
      * @returns {boolean}
      */
-    shouldComponentUpdate(nextProps: ReactNativeModalProps, nextState: ReactNativeModalProps) {
+    shouldComponentUpdate(nextProps: ReactNativeModalProps, nextState: State) {
         if (this.props.visible !== nextProps.visible
             || (this.state.visible !== nextProps.visible && this.state.visible === nextState.visible)
         ) {
             nextProps.visible ? this.open() : this.close();
             return false;
         }
-        return !(this.state.visible === nextProps.visible && this.state.visible === nextState.visible);
+        return !(
+            this.state.visible === nextProps.visible
+            && this.state.visible === nextState.visible
+            && this.state.closing === nextState.closing
+        );
     }
 
     /**
@@ -159,18 +153,18 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      * @returns {*}
      */
     render() {
-        const { visible } = this.state;
+        const { visible, closing } = this.state;
 
         if (!visible) {
             return null;
         }
 
-        const { overlayColor, allowClose, children, showAnimationType } = this._options;
-        const animationStyles = this.getAnimationStyles(showAnimationType, false);
+        const { overlayColor, allowClose, children, showAnimationType, hideAnimationType } = this._options;
+        const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType);
 
         return (
             <View style={styles.containerView}>
-                <TouchableWithoutFeedback onPress={() => allowClose && this.close()}>
+                <TouchableWithoutFeedback onPress={() => (!closing && allowClose) && this.close()}>
                     {
                         overlayColor !== 'transparent' ? <Animated.View
                             style={[
@@ -185,8 +179,6 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
 
                 </TouchableWithoutFeedback>
                 <Animated.View
-                    // @ts-ignore
-                    ref={this._contentAnimatedViewRef}
                     pointerEvents="box-none"
                     style={[styles.contentAnimatedView, animationStyles]}
                 >
@@ -197,11 +189,11 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     }
 
     /**
+     *  Returns animation styles for specified types
      *
      * @param types
-     * @param inverse
      */
-    getAnimationStyles = (types: AnimationTypes[], inverse: boolean) => {
+    getAnimationStyles = (types: AnimationTypes[]) => {
         return types.reduce((styles: { [key: string]: any }, type: AnimationTypes) => {
             switch (type) {
             case AnimationTypes.FADE:
@@ -215,28 +207,28 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
             case AnimationTypes.SLIDE_UP:
                 styles.top = this._contentAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [inverse ? -height : height, 0],
+                    outputRange: [height, 0],
                 });
                 break;
 
             case AnimationTypes.SLIDE_DOWN:
                 styles.top = this._contentAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [inverse ? height : -height, 0],
+                    outputRange: [-height, 0],
                 });
                 break;
 
             case AnimationTypes.SLIDE_LEFT:
                 styles.left = this._contentAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [inverse ? -width : width, 0],
+                    outputRange: [width, 0],
                 });
                 break;
 
             case AnimationTypes.SLIDE_RIGHT:
                 styles.left = this._contentAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [inverse ? width : -width, 0],
+                    outputRange: [-width, 0],
                 });
                 break;
             }
@@ -245,61 +237,55 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     };
 
     /**
-     *
      * Open modal
      *
-     * @param {node} children
-     * @param {object} options
+     * @param children
+     * @param options
      */
-    open = (children?: ReactNode, options: { [key: string]: any } = {}) => {
+    open = async (children?: ReactNode, options: { [key: string]: any } = {}) => {
 
-        return new Promise(async (resolve) => {
+        this._isOpen = true;
 
-            await this.close();
+        this._options = {
+            ...this.props,
+            ...options,
+            ...(children ? { children } : {}),
+        };
 
-            this._isOpen = true;
+        await this.stopAnimations();
 
-            this._options = {
-                ...this.props,
-                ...options,
-                ...(children ? { children } : {}),
-            };
+        if (Platform.OS === 'android') {
+            BackHandler.addEventListener('hardwareBackPress', this.backHandler);
+        }
 
-            await this.stopAnimations();
+        this.setState({
+            visible: true,
+            closing: false,
+        }, () => {
+            setImmediate(() => {
+                const animations = [
+                    Animated.timing(this._contentAnimation, {
+                        toValue: 1,
+                        duration: this._options.showContentDuration,
+                        easing: this._options.easingIn,
+                        useNativeDriver: false,
+                    }),
+                ];
 
-            if (Platform.OS === 'android') {
-                BackHandler.addEventListener('hardwareBackPress', this.backHandler);
-            }
-
-            this._setState({
-                visible: true,
-            }, () => {
-                setImmediate(() => {
-                    const animations = [
-                        Animated.timing(this._contentAnimation, {
+                if (this._options.overlayColor !== 'transparent') {
+                    animations.unshift(
+                        Animated.timing(this._overlayAnimation, {
                             toValue: 1,
-                            duration: this._options.showContentDuration,
-                            easing: this._options.easingIn,
+                            duration: this._options.showOverlayDuration,
                             useNativeDriver: false,
                         }),
-                    ];
+                    );
+                }
 
-                    if (this._options.overlayColor !== 'transparent') {
-                        animations.unshift(
-                            Animated.timing(this._overlayAnimation, {
-                                toValue: 1,
-                                duration: this._options.showOverlayDuration,
-                                useNativeDriver: false,
-                            }),
-                        );
+                Animated[this._options.showComposingType](animations).start(({ finished }) => {
+                    if (finished) {
+                        this._options.onOpen && this._options.onOpen();
                     }
-
-                    Animated[this._options.showComposingType](animations).start(({ finished }) => {
-                        if (finished) {
-                            this._options.onOpen && this._options.onOpen();
-                        }
-                        return resolve();
-                    });
                 });
             });
         });
@@ -307,30 +293,18 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
 
     /**
      * Close modal
-     *
-     * @returns {Promise<any>}
      */
     close = () => {
-        return new Promise((resolve) => {
-            if (!this._isOpen) {
-                return resolve();
-            }
 
-            this._isOpen = false;
+        this._isOpen = false;
 
+        this.setState({
+            closing: true,
+        }, () => {
             this.stopAnimations().then(() => {
 
                 if (Platform.OS === 'android') {
                     BackHandler.removeEventListener('hardwareBackPress', this.backHandler);
-                }
-
-                if (this._contentAnimatedViewRef.current) {
-                    this._contentAnimatedViewRef.current._attachProps({
-                        style: [
-                            styles.contentAnimatedView,
-                            this.getAnimationStyles(this._options.hideAnimationType, true),
-                        ],
-                    });
                 }
 
                 const animations = [
@@ -354,21 +328,20 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
 
                 Animated[this._options.hideComposingType](animations).start(({ finished }) => {
                     if (finished) {
-                        this._setState({
+                        this.setState({
                             visible: false,
+                            closing: false,
                         }, () => {
-                            resolve();
                             this._options.onClose && this._options.onClose();
-                            return;
                         });
                     }
-                    return resolve();
                 });
             });
         });
     };
 
     /**
+     * Android back handler
      *
      * @returns {boolean}
      */
@@ -381,6 +354,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     };
 
     /**
+     *  Stop animations
      *
      * @returns {Promise<void>}
      */
@@ -392,14 +366,13 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     };
 
     /**
-     *
+     * @override
      * @param state
      * @param callback
-     * @private
      */
-    _setState = (state: State, callback?: () => any) => {
+    setState = <K extends keyof State>(state: Pick<State, K>, callback?: () => any) => {
         if (this._mount) {
-            this.setState(state, callback);
+            super.setState(state, callback);
         }
     };
 
