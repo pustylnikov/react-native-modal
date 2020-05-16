@@ -101,13 +101,6 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
 
     /**
      *
-     * @type {object|null}
-     * @private
-     */
-    _options: ReactNativeModalProps = this.props;
-
-    /**
-     *
      * @type {boolean}
      * @private
      */
@@ -153,7 +146,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
             return null;
         }
 
-        const {overlayColor, onOverlayPress, children, showAnimationType, hideAnimationType} = this._options;
+        const {overlayColor, onOverlayPress, children, showAnimationType, hideAnimationType} = this.props;
         const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType);
 
         return (
@@ -234,19 +227,10 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
 
     /**
      * Open modal
-     *
-     * @param children
-     * @param options
      */
-    open = async (children?: ReactNode, options: { [key: string]: any } = {}) => {
+    open = async () => {
 
         this._isOpen = true;
-
-        this._options = {
-            ...this.props,
-            ...options,
-            ...(children ? {children} : {}),
-        };
 
         await this.stopAnimations();
 
@@ -262,25 +246,25 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                 const animations = [
                     Animated.timing(this._contentAnimation, {
                         toValue: 1,
-                        duration: this._options.showContentDuration,
-                        easing: this._options.easingIn,
+                        duration: this.props.showContentDuration,
+                        easing: this.props.easingIn,
                         useNativeDriver: false,
                     }),
                 ];
 
-                if (this._options.overlayColor !== 'transparent') {
+                if (this.props.overlayColor !== 'transparent') {
                     animations.unshift(
                         Animated.timing(this._overlayAnimation, {
                             toValue: 1,
-                            duration: this._options.showOverlayDuration,
+                            duration: this.props.showOverlayDuration,
                             useNativeDriver: false,
                         }),
                     );
                 }
 
-                Animated[this._options.showComposingType](animations).start(({finished}) => {
+                Animated[this.props.showComposingType](animations).start(({finished}) => {
                     if (finished) {
-                        this._options.onOpen && this._options.onOpen();
+                        this.props.onOpen && this.props.onOpen();
                     }
                 });
             });
@@ -306,29 +290,29 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                 const animations = [
                     Animated.timing(this._contentAnimation, {
                         toValue: 0,
-                        duration: this._options.hideContentDuration,
-                        easing: this._options.easingOut,
+                        duration: this.props.hideContentDuration,
+                        easing: this.props.easingOut,
                         useNativeDriver: false,
                     }),
                 ];
 
-                if (this._options.overlayColor !== 'transparent') {
+                if (this.props.overlayColor !== 'transparent') {
                     animations.push(
                         Animated.timing(this._overlayAnimation, {
                             toValue: 0,
-                            duration: this._options.hideOverlayDuration,
+                            duration: this.props.hideOverlayDuration,
                             useNativeDriver: false,
                         }),
                     );
                 }
 
-                Animated[this._options.hideComposingType](animations).start(({finished}) => {
+                Animated[this.props.hideComposingType](animations).start(({finished}) => {
                     if (finished) {
                         this.setState({
                             visible: false,
                             closing: false,
                         }, () => {
-                            this._options.onClose && this._options.onClose();
+                            this.props.onClose && this.props.onClose();
                         });
                     }
                 });
@@ -343,7 +327,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      */
     backHandler = () => {
         if (this._isOpen) {
-            this._options.onBackButtonPress && this._options.onBackButtonPress();
+            this.props.onBackButtonPress && this.props.onBackButtonPress();
             return true;
         }
         return false;

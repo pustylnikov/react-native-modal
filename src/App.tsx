@@ -5,20 +5,32 @@ import Modal, {AnimationTypes, ComposingTypes} from '../module';
 type Props = {};
 
 type State = {
-    visible: boolean;
+    visible: boolean
+    message: string | null
+    title: string | null
 };
 
 class App extends Component<Props, State> {
     state: State = {
         visible: false,
+        message: null,
+        title: null,
     };
 
     showModal = (): void => {
-        this.setState({visible: true});
+        this.setState({
+            visible: true,
+            message: 'Nulla vulputate orci nunc, eu maximus orci dapibus at. Vestibulum sed felis tortor. Donec' +
+                ' interdum iaculis pretium. Nunc vulputate rhoncus ligula ut bibendum. Nullam laoreet eget' +
+                ' erat non scelerisque.',
+            title: 'Nunc vulputate rhoncus',
+        });
     }
 
     closeModal = (): void => {
-        this.setState({visible: false});
+        this.setState({
+            visible: false,
+        });
     }
 
     render() {
@@ -45,14 +57,8 @@ class App extends Component<Props, State> {
 
                 >
                     <View style={styles.modalContentView}>
-                        <Text style={styles.modalTitleText}>
-                            Nulla vulputate orci
-                        </Text>
-                        <Text style={styles.modalContentText}>
-                            Nulla vulputate orci nunc, eu maximus orci dapibus at. Vestibulum sed felis tortor. Donec
-                            interdum iaculis pretium. Nunc vulputate rhoncus ligula ut bibendum. Nullam laoreet eget
-                            erat non scelerisque.
-                        </Text>
+                        <Text style={styles.modalTitleText}>{this.state.title}</Text>
+                        <Text style={styles.modalContentText}>{this.state.message}</Text>
                         <View style={styles.buttonView}>
                             <TouchableOpacity
                                 style={styles.button}
