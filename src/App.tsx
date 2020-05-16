@@ -51,7 +51,7 @@ class App extends Component<Props, State> {
                     hideContentDuration={150}
                     showComposingType={ComposingTypes.PARALLEL}
                     showAnimationType={[AnimationTypes.SLIDE_UP]}
-                    hideAnimationType={[AnimationTypes.SLIDE_DOWN]}
+                    hideAnimationType={[AnimationTypes.SLIDE_UP]}
                     onOverlayPress={this.closeModal}
                     onBackButtonPress={this.closeModal}
 

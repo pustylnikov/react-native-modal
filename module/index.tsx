@@ -147,7 +147,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
         }
 
         const {overlayColor, onOverlayPress, children, showAnimationType, hideAnimationType} = this.props;
-        const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType);
+        const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType, closing);
 
         return (
             <View style={styles.containerView}>
@@ -168,7 +168,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
 
                 </TouchableWithoutFeedback>
                 <Animated.View
-                    pointerEvents="box-none"
+                    pointerEvents={closing ? 'none' : 'box-none'}
                     style={[styles.contentAnimatedView, animationStyles]}
                 >
                     {children}
@@ -181,8 +181,9 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      *  Returns animation styles for specified types
      *
      * @param types
+     * @param inverse
      */
-    getAnimationStyles = (types: AnimationTypes[]) => {
+    getAnimationStyles = (types: AnimationTypes[], inverse: boolean) => {
         return types.reduce((styles: { [key: string]: any }, type: AnimationTypes) => {
             switch (type) {
                 case AnimationTypes.FADE:
@@ -196,28 +197,28 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                 case AnimationTypes.SLIDE_UP:
                     styles.top = this._contentAnimation.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [height, 0],
+                        outputRange: [inverse ? -height : height, 0],
                     });
                     break;
 
                 case AnimationTypes.SLIDE_DOWN:
                     styles.top = this._contentAnimation.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [-height, 0],
+                        outputRange: [inverse ? height : -height, 0],
                     });
                     break;
 
                 case AnimationTypes.SLIDE_LEFT:
                     styles.left = this._contentAnimation.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [width, 0],
+                        outputRange: [inverse ? -width : width, 0],
                     });
                     break;
 
                 case AnimationTypes.SLIDE_RIGHT:
                     styles.left = this._contentAnimation.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [-width, 0],
+                        outputRange: [inverse ? width : -width, 0],
                     });
                     break;
             }
