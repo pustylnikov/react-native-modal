@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react';
+import React, {Component, ReactNode} from 'react';
 import {
     Animated,
     BackHandler,
@@ -27,7 +27,6 @@ export enum AnimationTypes {
 
 export type ReactNativeModalProps = {
     visible: boolean
-    allowClose: boolean
     children: ReactNode
     overlayColor: string
     showOverlayDuration: number
@@ -40,8 +39,10 @@ export type ReactNativeModalProps = {
     hideAnimationType: AnimationTypes[]
     easingIn: EasingFunction
     easingOut: EasingFunction
-    onClose?: () => any
-    onOpen?: () => any
+    onClose?: () => void
+    onOpen?: () => void
+    onBackButtonPress?: () => void
+    onOverlayPress?: () => void
 }
 
 type State = {
@@ -49,13 +50,12 @@ type State = {
     closing: boolean
 }
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 export default class Modal extends Component<ReactNativeModalProps, State> {
 
     static defaultProps = {
         visible: false,
-        allowClose: true,
         overlayColor: 'rgba(0, 0, 0, 0.3)',
         showOverlayDuration: 150,
         showContentDuration: 150,
@@ -134,17 +134,11 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      * @returns {boolean}
      */
     shouldComponentUpdate(nextProps: ReactNativeModalProps, nextState: State) {
-        if (this.props.visible !== nextProps.visible
-            || (this.state.visible !== nextProps.visible && this.state.visible === nextState.visible)
-        ) {
+        if (this.props.visible !== nextProps.visible) {
             nextProps.visible ? this.open() : this.close();
             return false;
         }
-        return !(
-            this.state.visible === nextProps.visible
-            && this.state.visible === nextState.visible
-            && this.state.closing === nextState.closing
-        );
+        return this.state.visible !== nextState.visible || this.state.closing !== nextState.closing;
     }
 
     /**
@@ -153,18 +147,20 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      * @returns {*}
      */
     render() {
-        const { visible, closing } = this.state;
+        const {visible, closing} = this.state;
 
         if (!visible) {
             return null;
         }
 
-        const { overlayColor, allowClose, children, showAnimationType, hideAnimationType } = this._options;
+        const {overlayColor, onOverlayPress, children, showAnimationType, hideAnimationType} = this._options;
         const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType);
 
         return (
             <View style={styles.containerView}>
-                <TouchableWithoutFeedback onPress={() => (!closing && allowClose) && this.close()}>
+                <TouchableWithoutFeedback
+                    onPress={() => (!closing && onOverlayPress) && onOverlayPress()}
+                >
                     {
                         overlayColor !== 'transparent' ? <Animated.View
                             style={[
@@ -174,7 +170,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                                     opacity: this._overlayAnimation,
                                 },
                             ]}
-                        /> : <View style={styles.overlayView} />
+                        /> : <View style={styles.overlayView}/>
                     }
 
                 </TouchableWithoutFeedback>
@@ -196,41 +192,41 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     getAnimationStyles = (types: AnimationTypes[]) => {
         return types.reduce((styles: { [key: string]: any }, type: AnimationTypes) => {
             switch (type) {
-            case AnimationTypes.FADE:
-                styles.opacity = this._contentAnimation;
-                break;
+                case AnimationTypes.FADE:
+                    styles.opacity = this._contentAnimation;
+                    break;
 
-            case AnimationTypes.SCALE:
-                styles.transform = [{ scale: this._contentAnimation }];
-                break;
+                case AnimationTypes.SCALE:
+                    styles.transform = [{scale: this._contentAnimation}];
+                    break;
 
-            case AnimationTypes.SLIDE_UP:
-                styles.top = this._contentAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [height, 0],
-                });
-                break;
+                case AnimationTypes.SLIDE_UP:
+                    styles.top = this._contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [height, 0],
+                    });
+                    break;
 
-            case AnimationTypes.SLIDE_DOWN:
-                styles.top = this._contentAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-height, 0],
-                });
-                break;
+                case AnimationTypes.SLIDE_DOWN:
+                    styles.top = this._contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-height, 0],
+                    });
+                    break;
 
-            case AnimationTypes.SLIDE_LEFT:
-                styles.left = this._contentAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [width, 0],
-                });
-                break;
+                case AnimationTypes.SLIDE_LEFT:
+                    styles.left = this._contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [width, 0],
+                    });
+                    break;
 
-            case AnimationTypes.SLIDE_RIGHT:
-                styles.left = this._contentAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-width, 0],
-                });
-                break;
+                case AnimationTypes.SLIDE_RIGHT:
+                    styles.left = this._contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-width, 0],
+                    });
+                    break;
             }
             return styles;
         }, {});
@@ -249,7 +245,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
         this._options = {
             ...this.props,
             ...options,
-            ...(children ? { children } : {}),
+            ...(children ? {children} : {}),
         };
 
         await this.stopAnimations();
@@ -282,7 +278,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                     );
                 }
 
-                Animated[this._options.showComposingType](animations).start(({ finished }) => {
+                Animated[this._options.showComposingType](animations).start(({finished}) => {
                     if (finished) {
                         this._options.onOpen && this._options.onOpen();
                     }
@@ -326,7 +322,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                     );
                 }
 
-                Animated[this._options.hideComposingType](animations).start(({ finished }) => {
+                Animated[this._options.hideComposingType](animations).start(({finished}) => {
                     if (finished) {
                         this.setState({
                             visible: false,
@@ -347,7 +343,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
      */
     backHandler = () => {
         if (this._isOpen) {
-            this._options.allowClose && this.close();
+            this._options.onBackButtonPress && this._options.onBackButtonPress();
             return true;
         }
         return false;

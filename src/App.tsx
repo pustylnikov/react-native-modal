@@ -1,6 +1,6 @@
-import React, { Component } from 'react';
-import { Button, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
-import Modal, { AnimationTypes, ComposingTypes } from '../module';
+import React, {Component} from 'react';
+import {Button, SafeAreaView, StatusBar, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
+import Modal, {AnimationTypes, ComposingTypes} from '../module';
 
 type Props = {};
 
@@ -13,27 +13,35 @@ class App extends Component<Props, State> {
         visible: false,
     };
 
+    showModal = (): void => {
+        this.setState({visible: true});
+    }
+
+    closeModal = (): void => {
+        this.setState({visible: false});
+    }
+
     render() {
         return (
             <View style={styles.container}>
-                <StatusBar barStyle="dark-content" />
+                <StatusBar barStyle="dark-content"/>
                 <SafeAreaView>
                     <Button
-                        title="SHOW"
-                        onPress={() => {
-                            this.setState({ visible: true });
-                        }}
+                        title="SHOW MODAL"
+                        onPress={this.showModal}
                     />
                 </SafeAreaView>
                 <Modal
                     visible={this.state.visible}
-                    showOverlayDuration={500}
-                    showContentDuration={500}
-                    hideOverlayDuration={500}
-                    hideContentDuration={500}
+                    showOverlayDuration={150}
+                    showContentDuration={150}
+                    hideOverlayDuration={150}
+                    hideContentDuration={150}
                     showComposingType={ComposingTypes.PARALLEL}
                     showAnimationType={[AnimationTypes.SLIDE_UP]}
                     hideAnimationType={[AnimationTypes.SLIDE_DOWN]}
+                    onOverlayPress={this.closeModal}
+                    onBackButtonPress={this.closeModal}
 
                 >
                     <View style={styles.modalContentView}>
@@ -45,6 +53,14 @@ class App extends Component<Props, State> {
                             interdum iaculis pretium. Nunc vulputate rhoncus ligula ut bibendum. Nullam laoreet eget
                             erat non scelerisque.
                         </Text>
+                        <View style={styles.buttonView}>
+                            <TouchableOpacity
+                                style={styles.button}
+                                onPress={this.closeModal}
+                            >
+                                <Text style={styles.buttonText}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </Modal>
             </View>
@@ -80,6 +96,17 @@ const styles = StyleSheet.create({
     modalContentText: {
         fontSize: 16,
         textAlign: 'center',
+    },
+    buttonView: {
+        alignItems: 'center',
+    },
+    button: {
+        marginTop: 10,
+    },
+    buttonText: {
+        fontSize: 18,
+        color: '#1b73a0',
+        fontWeight: 'bold',
     },
 });
 
