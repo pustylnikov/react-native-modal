@@ -11,6 +11,8 @@ import {
     View,
 } from 'react-native';
 
+type AnyObject = { [key: string]: any };
+
 export enum ComposingTypes {
     PARALLEL = 'parallel',
     SEQUENCE = 'sequence',
@@ -25,9 +27,27 @@ export enum AnimationTypes {
     SLIDE_RIGHT = 'slide-right',
 }
 
-export type ReactNativeModalProps = {
-    visible: boolean
-    children: ReactNode
+export type ModalProperties = {
+    render: () => ReactNode
+    overlayColor?: string
+    showOverlayDuration?: number
+    showContentDuration?: number
+    hideOverlayDuration?: number
+    hideContentDuration?: number
+    showComposingType?: ComposingTypes
+    hideComposingType?: ComposingTypes
+    showAnimationType?: AnimationTypes[]
+    hideAnimationType?: AnimationTypes[]
+    easingIn?: EasingFunction
+    easingOut?: EasingFunction
+    onClose?: () => void
+    onOpen?: () => void
+    onBackButtonPress?: () => void
+    onOverlayPress?: () => void
+}
+
+type PreparedProperties = {
+    render: () => ReactNode
     overlayColor: string
     showOverlayDuration: number
     showContentDuration: number
@@ -45,15 +65,37 @@ export type ReactNativeModalProps = {
     onOverlayPress?: () => void
 }
 
-type State = {
-    visible: boolean
+export type ModalProps = {
+    overlayColor: string
+    showOverlayDuration: number
+    showContentDuration: number
+    hideOverlayDuration: number
+    hideContentDuration: number
+    showComposingType: ComposingTypes
+    hideComposingType: ComposingTypes
+    showAnimationType: AnimationTypes[]
+    hideAnimationType: AnimationTypes[]
+    easingIn: EasingFunction
+    easingOut: EasingFunction
+    onClose?: () => void
+    onOpen?: () => void
+    onBackButtonPress?: () => void
+    onOverlayPress?: () => void
+    propsAreEqual?: (prevProps: Readonly<ModalProps>, nextProps: Readonly<ModalProps>) => boolean
+}
+
+type ModalState = {
     closing: boolean
+    visible: boolean
 }
 
 const {width, height} = Dimensions.get('window');
 
-export default class Modal extends Component<ReactNativeModalProps, State> {
+export default class Modal extends Component<ModalProps, ModalState> {
 
+    /**
+     * Defines the default prop values
+     */
     static defaultProps = {
         visible: false,
         overlayColor: 'rgba(0, 0, 0, 0.3)',
@@ -70,68 +112,247 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
     };
 
     /**
-     *
-     * @type {object}
+     * Component state
      */
-    state = {
-        visible: this.props.visible,
+    state: ModalState = {
+        visible: false,
         closing: false,
     };
 
     /**
-     *
-     * @type {Animated.AnimatedValue}
-     * @private
+     * Overlay animation
      */
-    _overlayAnimation: Animated.AnimatedValue = new Animated.Value(+this.props.visible);
+    protected overlayAnimation: Animated.AnimatedValue = new Animated.Value(0);
 
     /**
-     *
-     * @type {Animated.AnimatedValue}
-     * @private
+     * Content animation
      */
-    _contentAnimation: Animated.AnimatedValue = new Animated.Value(+this.props.visible);
+    protected contentAnimation: Animated.AnimatedValue = new Animated.Value(0);
 
     /**
-     *
-     * @type {Boolean}
-     * @private
+     * Indicates the component is opened
      */
-    _isOpen: boolean = this.props.visible;
+    protected isOpen: boolean = false;
 
     /**
-     *
-     * @type {boolean}
-     * @private
+     * Indicates the component is mounted
      */
-    _mount: boolean = false;
+    protected mount: boolean = false;
+
+    /**
+     * Modal properties
+     */
+    protected properties: PreparedProperties = {...this.props, render: () => null};
+
+    /**
+     *  Returns animation styles for specified types
+     *
+     * @param types
+     * @param inverse
+     */
+    protected getAnimationStyles = (types: AnimationTypes[], inverse: boolean): AnyObject => {
+        return types.reduce((styles: { [key: string]: any }, type: AnimationTypes) => {
+            switch (type) {
+                case AnimationTypes.FADE:
+                    styles.opacity = this.contentAnimation;
+                    break;
+
+                case AnimationTypes.SCALE:
+                    styles.transform = [{scale: this.contentAnimation}];
+                    break;
+
+                case AnimationTypes.SLIDE_UP:
+                    styles.top = this.contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [inverse ? -height : height, 0],
+                    });
+                    break;
+
+                case AnimationTypes.SLIDE_DOWN:
+                    styles.top = this.contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [inverse ? height : -height, 0],
+                    });
+                    break;
+
+                case AnimationTypes.SLIDE_LEFT:
+                    styles.left = this.contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [inverse ? -width : width, 0],
+                    });
+                    break;
+
+                case AnimationTypes.SLIDE_RIGHT:
+                    styles.left = this.contentAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [inverse ? width : -width, 0],
+                    });
+                    break;
+            }
+            return styles;
+        }, {});
+    };
+
+    /**
+     * Open modal
+     */
+    public open = (properties: ModalProperties): void => {
+
+        this.isOpen = true;
+        this.properties = {
+            ...this.props,
+            ...properties,
+        };
+
+        this.stopAnimations().then(() => {
+            if (Platform.OS === 'android') {
+                BackHandler.addEventListener('hardwareBackPress', this.backHandler);
+            }
+
+            this.setState({
+                visible: true,
+                closing: false,
+            }, () => {
+                setImmediate(() => {
+                    const animations = [
+                        Animated.timing(this.contentAnimation, {
+                            toValue: 1,
+                            duration: this.properties.showContentDuration,
+                            easing: this.properties.easingIn,
+                            useNativeDriver: false,
+                        }),
+                    ];
+
+                    if (this.props.overlayColor !== 'transparent') {
+                        animations.unshift(
+                            Animated.timing(this.overlayAnimation, {
+                                toValue: 1,
+                                duration: this.properties.showOverlayDuration,
+                                useNativeDriver: false,
+                            }),
+                        );
+                    }
+
+                    Animated[this.properties.showComposingType](animations).start(({finished}) => {
+                        if (finished) {
+                            this.properties.onOpen && this.properties.onOpen();
+                        }
+                    });
+                });
+            });
+        });
+    };
+
+    /**
+     * Close modal
+     */
+    public close = (): void => {
+
+        this.isOpen = false;
+
+        this.setState({
+            closing: true,
+        }, () => {
+            this.stopAnimations().then(() => {
+                if (Platform.OS === 'android') {
+                    BackHandler.removeEventListener('hardwareBackPress', this.backHandler);
+                }
+
+                const animations = [
+                    Animated.timing(this.contentAnimation, {
+                        toValue: 0,
+                        duration: this.properties.hideContentDuration,
+                        easing: this.properties.easingOut,
+                        useNativeDriver: false,
+                    }),
+                ];
+
+                if (this.properties.overlayColor !== 'transparent') {
+                    animations.push(
+                        Animated.timing(this.overlayAnimation, {
+                            toValue: 0,
+                            duration: this.properties.hideOverlayDuration,
+                            useNativeDriver: false,
+                        }),
+                    );
+                }
+
+                Animated[this.properties.hideComposingType](animations).start(({finished}) => {
+                    if (finished) {
+                        this.setState({
+                            visible: false,
+                            closing: false,
+                        }, () => {
+                            this.properties.onClose && this.properties.onClose();
+                        });
+                    }
+                });
+            });
+        });
+    };
+
+    /**
+     * Android back handler
+     *
+     * @returns {boolean}
+     */
+    protected backHandler = (): boolean => {
+        if (this.isOpen) {
+            this.properties.onBackButtonPress && this.properties.onBackButtonPress();
+            return true;
+        }
+        return false;
+    };
+
+    /**
+     *  Stop animations
+     *
+     * @returns {Promise<void>}
+     */
+    protected stopAnimations = async (): Promise<void> => {
+        await Promise.all([
+            new Promise((resolve) => this.overlayAnimation.stopAnimation(resolve)),
+            new Promise((resolve) => this.contentAnimation.stopAnimation(resolve)),
+        ]);
+    };
+
+    /**
+     * @override
+     * @param state
+     * @param callback
+     */
+    public setState = <K extends keyof ModalState>(state: Pick<ModalState, K>, callback?: () => any) => {
+        if (this.mount) {
+            super.setState(state, callback);
+        }
+    };
 
     /**
      * Mount
      */
     componentDidMount() {
-        this._mount = true;
+        this.mount = true;
     }
 
     /**
      * Unmount
      */
     componentWillUnmount() {
-        this._mount = false;
+        this.mount = false;
     }
 
     /**
-     *
-     * @param {object} nextProps
-     * @param {object} nextState
-     * @returns {boolean}
+     * @param nextProps
+     * @param nextState
      */
-    shouldComponentUpdate(nextProps: ReactNativeModalProps, nextState: State) {
-        if (this.props.visible !== nextProps.visible) {
-            nextProps.visible ? this.open() : this.close();
-            return false;
-        }
-        return this.state.visible !== nextState.visible || this.state.closing !== nextState.closing;
+    shouldComponentUpdate(nextProps: ModalProps, nextState: ModalState): boolean {
+        const {propsAreEqual} = this.props;
+        const {visible, closing} = this.state;
+        return !(
+            visible === nextState.visible
+            && closing === nextState.closing
+            && (propsAreEqual ? propsAreEqual(this.props, nextProps) : true)
+        );
     }
 
     /**
@@ -146,7 +367,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
             return null;
         }
 
-        const {overlayColor, onOverlayPress, children, showAnimationType, hideAnimationType} = this.props;
+        const {overlayColor, onOverlayPress, render, showAnimationType, hideAnimationType} = this.properties;
         const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType, closing);
 
         return (
@@ -160,7 +381,7 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                                 styles.overlayView,
                                 {
                                     backgroundColor: overlayColor,
-                                    opacity: this._overlayAnimation,
+                                    opacity: this.overlayAnimation,
                                 },
                             ]}
                         /> : <View style={styles.overlayView}/>
@@ -171,192 +392,11 @@ export default class Modal extends Component<ReactNativeModalProps, State> {
                     pointerEvents={closing ? 'none' : 'box-none'}
                     style={[styles.contentAnimatedView, animationStyles]}
                 >
-                    {children}
+                    {render()}
                 </Animated.View>
             </View>
         );
     }
-
-    /**
-     *  Returns animation styles for specified types
-     *
-     * @param types
-     * @param inverse
-     */
-    getAnimationStyles = (types: AnimationTypes[], inverse: boolean) => {
-        return types.reduce((styles: { [key: string]: any }, type: AnimationTypes) => {
-            switch (type) {
-                case AnimationTypes.FADE:
-                    styles.opacity = this._contentAnimation;
-                    break;
-
-                case AnimationTypes.SCALE:
-                    styles.transform = [{scale: this._contentAnimation}];
-                    break;
-
-                case AnimationTypes.SLIDE_UP:
-                    styles.top = this._contentAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [inverse ? -height : height, 0],
-                    });
-                    break;
-
-                case AnimationTypes.SLIDE_DOWN:
-                    styles.top = this._contentAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [inverse ? height : -height, 0],
-                    });
-                    break;
-
-                case AnimationTypes.SLIDE_LEFT:
-                    styles.left = this._contentAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [inverse ? -width : width, 0],
-                    });
-                    break;
-
-                case AnimationTypes.SLIDE_RIGHT:
-                    styles.left = this._contentAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [inverse ? width : -width, 0],
-                    });
-                    break;
-            }
-            return styles;
-        }, {});
-    };
-
-    /**
-     * Open modal
-     */
-    open = async () => {
-
-        this._isOpen = true;
-
-        await this.stopAnimations();
-
-        if (Platform.OS === 'android') {
-            BackHandler.addEventListener('hardwareBackPress', this.backHandler);
-        }
-
-        this.setState({
-            visible: true,
-            closing: false,
-        }, () => {
-            setImmediate(() => {
-                const animations = [
-                    Animated.timing(this._contentAnimation, {
-                        toValue: 1,
-                        duration: this.props.showContentDuration,
-                        easing: this.props.easingIn,
-                        useNativeDriver: false,
-                    }),
-                ];
-
-                if (this.props.overlayColor !== 'transparent') {
-                    animations.unshift(
-                        Animated.timing(this._overlayAnimation, {
-                            toValue: 1,
-                            duration: this.props.showOverlayDuration,
-                            useNativeDriver: false,
-                        }),
-                    );
-                }
-
-                Animated[this.props.showComposingType](animations).start(({finished}) => {
-                    if (finished) {
-                        this.props.onOpen && this.props.onOpen();
-                    }
-                });
-            });
-        });
-    };
-
-    /**
-     * Close modal
-     */
-    close = () => {
-
-        this._isOpen = false;
-
-        this.setState({
-            closing: true,
-        }, () => {
-            this.stopAnimations().then(() => {
-
-                if (Platform.OS === 'android') {
-                    BackHandler.removeEventListener('hardwareBackPress', this.backHandler);
-                }
-
-                const animations = [
-                    Animated.timing(this._contentAnimation, {
-                        toValue: 0,
-                        duration: this.props.hideContentDuration,
-                        easing: this.props.easingOut,
-                        useNativeDriver: false,
-                    }),
-                ];
-
-                if (this.props.overlayColor !== 'transparent') {
-                    animations.push(
-                        Animated.timing(this._overlayAnimation, {
-                            toValue: 0,
-                            duration: this.props.hideOverlayDuration,
-                            useNativeDriver: false,
-                        }),
-                    );
-                }
-
-                Animated[this.props.hideComposingType](animations).start(({finished}) => {
-                    if (finished) {
-                        this.setState({
-                            visible: false,
-                            closing: false,
-                        }, () => {
-                            this.props.onClose && this.props.onClose();
-                        });
-                    }
-                });
-            });
-        });
-    };
-
-    /**
-     * Android back handler
-     *
-     * @returns {boolean}
-     */
-    backHandler = () => {
-        if (this._isOpen) {
-            this.props.onBackButtonPress && this.props.onBackButtonPress();
-            return true;
-        }
-        return false;
-    };
-
-    /**
-     *  Stop animations
-     *
-     * @returns {Promise<void>}
-     */
-    stopAnimations = async (): Promise<void> => {
-        await Promise.all([
-            new Promise((resolve) => this._overlayAnimation.stopAnimation(resolve)),
-            new Promise((resolve) => this._contentAnimation.stopAnimation(resolve)),
-        ]);
-    };
-
-    /**
-     * @override
-     * @param state
-     * @param callback
-     */
-    setState = <K extends keyof State>(state: Pick<State, K>, callback?: () => any) => {
-        if (this._mount) {
-            super.setState(state, callback);
-        }
-    };
-
 }
 
 const styles = StyleSheet.create({
