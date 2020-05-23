@@ -1,7 +1,8 @@
-import React, {Component, RefObject} from 'react';
+import React, {Component} from 'react';
 import {Button, SafeAreaView, StatusBar, StyleSheet, View} from 'react-native';
 import Modal, {AnimationTypes, ComposingTypes} from '../src';
 import Alert from './Alert';
+import {setModalRef, openModal, closeModal} from '../src/helper';
 
 type Props = {};
 
@@ -13,38 +14,30 @@ type State = {
 
 class App extends Component<Props, State> {
 
-    modalRef: RefObject<Modal> | null = React.createRef();
-
     showFirstModal = (): void => {
-        if (this.modalRef && this.modalRef.current) {
-            this.modalRef.current.open({
-                render: () => {
-                    return <Alert title="Alert title" text="Alert text"/>;
-                },
-                overlayColor: 'rgba(0,0,0, 0.3)',
-                showAnimationType: [AnimationTypes.SLIDE_UP],
-                hideAnimationType: [AnimationTypes.SLIDE_UP],
-            });
-        }
+        openModal({
+            render: () => {
+                return <Alert title="Alert title" text="Alert text"/>;
+            },
+            overlayColor: 'rgba(0,0,0, 0.3)',
+            showAnimationType: [AnimationTypes.SLIDE_UP],
+            hideAnimationType: [AnimationTypes.SLIDE_UP],
+        });
     }
 
     showSecondModal = (): void => {
-        if (this.modalRef && this.modalRef.current) {
-            this.modalRef.current.open({
-                render: () => {
-                    return <Alert title="Alert title 2" text="Alert text 2"/>;
-                },
-                overlayColor: 'rgba(255,255,0, 0.3)',
-                showAnimationType: [AnimationTypes.SLIDE_RIGHT],
-                hideAnimationType: [AnimationTypes.SLIDE_LEFT],
-            });
-        }
+        openModal({
+            render: () => {
+                return <Alert title="Alert title 2" text="Alert text 2"/>;
+            },
+            overlayColor: 'rgba(255,255,0, 0.3)',
+            showAnimationType: [AnimationTypes.SLIDE_RIGHT],
+            hideAnimationType: [AnimationTypes.SLIDE_LEFT],
+        });
     }
 
     closeModal = (): void => {
-        if (this.modalRef && this.modalRef.current) {
-            this.modalRef.current.close();
-        }
+        closeModal();
     }
 
     render() {
@@ -68,7 +61,7 @@ class App extends Component<Props, State> {
                 </SafeAreaView>
 
                 <Modal
-                    ref={this.modalRef}
+                    ref={setModalRef}
                     overlayColor="#fff"
                     showOverlayDuration={150}
                     showContentDuration={150}

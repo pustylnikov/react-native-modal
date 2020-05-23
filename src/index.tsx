@@ -196,49 +196,53 @@ export default class Modal extends Component<ModalProps, ModalState> {
     /**
      * Open modal
      */
-    public open = (properties: ModalProperties): void => {
+    public open = (properties: ModalProperties): Promise<void> => {
+        return new Promise(async (resolve) => {
+            if (this.isOpen) {
+                await this.close();
+            }
 
-        this.isOpen = true;
-        this.properties = {
-            ...this.props,
-            ...properties,
-        };
+            this.isOpen = true;
+            this.properties = {
+                ...this.props,
+                ...properties,
+            };
 
-        this.stopAnimations().then(() => {
+            await this.stopAnimations();
+
             if (Platform.OS === 'android') {
                 BackHandler.addEventListener('hardwareBackPress', this.backHandler);
             }
 
-            this.setState({
+            await this.setState({
                 visible: true,
                 closing: false,
-            }, () => {
-                setImmediate(() => {
-                    const animations = [
-                        Animated.timing(this.contentAnimation, {
-                            toValue: 1,
-                            duration: this.properties.showContentDuration,
-                            easing: this.properties.easingIn,
-                            useNativeDriver: false,
-                        }),
-                    ];
+            });
 
-                    if (this.props.overlayColor !== 'transparent') {
-                        animations.unshift(
-                            Animated.timing(this.overlayAnimation, {
-                                toValue: 1,
-                                duration: this.properties.showOverlayDuration,
-                                useNativeDriver: false,
-                            }),
-                        );
-                    }
+            const animations = [
+                Animated.timing(this.contentAnimation, {
+                    toValue: 1,
+                    duration: this.properties.showContentDuration,
+                    easing: this.properties.easingIn,
+                    useNativeDriver: false,
+                }),
+            ];
 
-                    Animated[this.properties.showComposingType](animations).start(({finished}) => {
-                        if (finished) {
-                            this.properties.onOpen && this.properties.onOpen();
-                        }
-                    });
-                });
+            if (this.props.overlayColor !== 'transparent') {
+                animations.unshift(
+                    Animated.timing(this.overlayAnimation, {
+                        toValue: 1,
+                        duration: this.properties.showOverlayDuration,
+                        useNativeDriver: false,
+                    }),
+                );
+            }
+
+            Animated[this.properties.showComposingType](animations).start(({finished}) => {
+                if (finished) {
+                    this.properties.onOpen && this.properties.onOpen();
+                }
+                resolve();
             });
         });
     };
@@ -246,47 +250,44 @@ export default class Modal extends Component<ModalProps, ModalState> {
     /**
      * Close modal
      */
-    public close = (): void => {
+    public close = (): Promise<void> => {
+        return new Promise(async (resolve) => {
+            await this.setState({closing: true});
+            await this.stopAnimations();
 
-        this.isOpen = false;
+            if (Platform.OS === 'android') {
+                BackHandler.removeEventListener('hardwareBackPress', this.backHandler);
+            }
 
-        this.setState({
-            closing: true,
-        }, () => {
-            this.stopAnimations().then(() => {
-                if (Platform.OS === 'android') {
-                    BackHandler.removeEventListener('hardwareBackPress', this.backHandler);
-                }
+            const animations = [
+                Animated.timing(this.contentAnimation, {
+                    toValue: 0,
+                    duration: this.properties.hideContentDuration,
+                    easing: this.properties.easingOut,
+                    useNativeDriver: false,
+                }),
+            ];
 
-                const animations = [
-                    Animated.timing(this.contentAnimation, {
+            if (this.properties.overlayColor !== 'transparent') {
+                animations.push(
+                    Animated.timing(this.overlayAnimation, {
                         toValue: 0,
-                        duration: this.properties.hideContentDuration,
-                        easing: this.properties.easingOut,
+                        duration: this.properties.hideOverlayDuration,
                         useNativeDriver: false,
                     }),
-                ];
+                );
+            }
 
-                if (this.properties.overlayColor !== 'transparent') {
-                    animations.push(
-                        Animated.timing(this.overlayAnimation, {
-                            toValue: 0,
-                            duration: this.properties.hideOverlayDuration,
-                            useNativeDriver: false,
-                        }),
-                    );
+            Animated[this.properties.hideComposingType](animations).start(async ({finished}) => {
+                if (finished) {
+                    await this.setState({
+                        visible: false,
+                        closing: false,
+                    });
+                    this.properties.onClose && this.properties.onClose();
                 }
-
-                Animated[this.properties.hideComposingType](animations).start(({finished}) => {
-                    if (finished) {
-                        this.setState({
-                            visible: false,
-                            closing: false,
-                        }, () => {
-                            this.properties.onClose && this.properties.onClose();
-                        });
-                    }
-                });
+                this.isOpen = false;
+                resolve();
             });
         });
     };
@@ -319,12 +320,15 @@ export default class Modal extends Component<ModalProps, ModalState> {
     /**
      * @override
      * @param state
-     * @param callback
      */
-    public setState = <K extends keyof ModalState>(state: Pick<ModalState, K>, callback?: () => any) => {
-        if (this.mount) {
-            super.setState(state, callback);
-        }
+    public setState = <K extends keyof ModalState>(state: Pick<ModalState, K>): Promise<void> => {
+        return new Promise((resolve) => {
+            if (this.mount) {
+                super.setState(state, resolve);
+            } else {
+                resolve();
+            }
+        });
     };
 
     /**
