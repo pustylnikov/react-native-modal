@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {Button, SafeAreaView, StatusBar, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
-import Modal, {AnimationTypes, ComposingTypes} from '../module';
+import Modal, {AnimationTypes, ComposingTypes} from '../src';
 
 type Props = {};
 
