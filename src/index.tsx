@@ -287,6 +287,7 @@ export default class Modal extends Component<ModalProps, ModalState> {
                     this.properties.onClose && this.properties.onClose();
                 }
                 this.isOpen = false;
+                // TODO will need to clear this.properties like this: this.properties = undefined;
                 resolve();
             });
         });
