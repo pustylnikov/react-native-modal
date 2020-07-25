@@ -27,46 +27,17 @@ export enum AnimationTypes {
     SLIDE_RIGHT = 'slide-right',
 }
 
-export type ModalProperties = {
+export type ModalProperties = Partial<Omit<ModalProps, 'propsAreEqual'>> & {
     render: () => ReactNode
-    overlayColor?: string
-    showOverlayDuration?: number
-    showContentDuration?: number
-    hideOverlayDuration?: number
-    hideContentDuration?: number
-    showComposingType?: ComposingTypes
-    hideComposingType?: ComposingTypes
-    showAnimationType?: AnimationTypes[]
-    hideAnimationType?: AnimationTypes[]
-    easingIn?: EasingFunction
-    easingOut?: EasingFunction
-    onClose?: () => void
-    onOpen?: () => void
-    onBackButtonPress?: () => void
-    onOverlayPress?: () => void
 }
 
-type PreparedProperties = {
+type PreparedProperties = Omit<ModalProps, 'propsAreEqual'> & {
     render: () => ReactNode
-    overlayColor: string
-    showOverlayDuration: number
-    showContentDuration: number
-    hideOverlayDuration: number
-    hideContentDuration: number
-    showComposingType: ComposingTypes
-    hideComposingType: ComposingTypes
-    showAnimationType: AnimationTypes[]
-    hideAnimationType: AnimationTypes[]
-    easingIn: EasingFunction
-    easingOut: EasingFunction
-    onClose?: () => void
-    onOpen?: () => void
-    onBackButtonPress?: () => void
-    onOverlayPress?: () => void
 }
 
 export type ModalProps = {
     overlayColor: string
+    overlayComponent: ReactNode
     showOverlayDuration: number
     showContentDuration: number
     hideOverlayDuration: number
@@ -99,6 +70,7 @@ export default class Modal extends Component<ModalProps, ModalState> {
     static defaultProps = {
         visible: false,
         overlayColor: 'rgba(0, 0, 0, 0.3)',
+        overlayComponent: null,
         showOverlayDuration: 150,
         showContentDuration: 150,
         hideOverlayDuration: 150,
@@ -220,6 +192,11 @@ export default class Modal extends Component<ModalProps, ModalState> {
             });
 
             const animations = [
+                Animated.timing(this.overlayAnimation, {
+                    toValue: 1,
+                    duration: this.properties.showOverlayDuration,
+                    useNativeDriver: false,
+                }),
                 Animated.timing(this.contentAnimation, {
                     toValue: 1,
                     duration: this.properties.showContentDuration,
@@ -227,16 +204,6 @@ export default class Modal extends Component<ModalProps, ModalState> {
                     useNativeDriver: false,
                 }),
             ];
-
-            if (this.props.overlayColor !== 'transparent') {
-                animations.unshift(
-                    Animated.timing(this.overlayAnimation, {
-                        toValue: 1,
-                        duration: this.properties.showOverlayDuration,
-                        useNativeDriver: false,
-                    }),
-                );
-            }
 
             Animated[this.properties.showComposingType](animations).start(({finished}) => {
                 if (finished) {
@@ -266,17 +233,12 @@ export default class Modal extends Component<ModalProps, ModalState> {
                     easing: this.properties.easingOut,
                     useNativeDriver: false,
                 }),
+                Animated.timing(this.overlayAnimation, {
+                    toValue: 0,
+                    duration: this.properties.hideOverlayDuration,
+                    useNativeDriver: false,
+                }),
             ];
-
-            if (this.properties.overlayColor !== 'transparent') {
-                animations.push(
-                    Animated.timing(this.overlayAnimation, {
-                        toValue: 0,
-                        duration: this.properties.hideOverlayDuration,
-                        useNativeDriver: false,
-                    }),
-                );
-            }
 
             Animated[this.properties.hideComposingType](animations).start(async ({finished}) => {
                 if (finished) {
@@ -372,7 +334,7 @@ export default class Modal extends Component<ModalProps, ModalState> {
             return null;
         }
 
-        const {overlayColor, onOverlayPress, render, showAnimationType, hideAnimationType} = this.properties;
+        const {overlayColor, overlayComponent, onOverlayPress, render, showAnimationType, hideAnimationType} = this.properties;
         const animationStyles = this.getAnimationStyles(closing ? hideAnimationType : showAnimationType, closing);
 
         return (
@@ -380,17 +342,17 @@ export default class Modal extends Component<ModalProps, ModalState> {
                 <TouchableWithoutFeedback
                     onPress={() => (!closing && onOverlayPress) && onOverlayPress()}
                 >
-                    {
-                        overlayColor !== 'transparent' ? <Animated.View
-                            style={[
-                                styles.overlayView,
-                                {
-                                    backgroundColor: overlayColor,
-                                    opacity: this.overlayAnimation,
-                                },
-                            ]}
-                        /> : <View style={styles.overlayView}/>
-                    }
+                    <Animated.View
+                        style={[
+                            styles.overlayView,
+                            {
+                                backgroundColor: overlayColor,
+                                opacity: this.overlayAnimation,
+                            },
+                        ]}
+                    >
+                        {overlayComponent}
+                    </Animated.View>
 
                 </TouchableWithoutFeedback>
                 <Animated.View
