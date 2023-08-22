@@ -48,6 +48,8 @@ export type ModalProps = {
     hideAnimationType: AnimationTypes[]
     easingIn: EasingFunction
     easingOut: EasingFunction
+    enterUseNativeDriver: boolean
+    exitUseNativeDriver: boolean
     onClose?: () => void
     onOpen?: () => void
     onBackButtonPress?: () => void
@@ -81,6 +83,8 @@ export default class Modal extends Component<ModalProps, ModalState> {
         hideAnimationType: [AnimationTypes.FADE],
         easingIn: Easing.ease,
         easingOut: Easing.ease,
+        enterUseNativeDriver: false,
+        exitUseNativeDriver: false,
     };
 
     /**
@@ -195,13 +199,13 @@ export default class Modal extends Component<ModalProps, ModalState> {
                 Animated.timing(this.overlayAnimation, {
                     toValue: 1,
                     duration: this.properties.showOverlayDuration,
-                    useNativeDriver: false,
+                    useNativeDriver: this.properties.enterUseNativeDriver,
                 }),
                 Animated.timing(this.contentAnimation, {
                     toValue: 1,
                     duration: this.properties.showContentDuration,
                     easing: this.properties.easingIn,
-                    useNativeDriver: false,
+                    useNativeDriver: this.properties.enterUseNativeDriver,
                 }),
             ];
 
@@ -231,12 +235,12 @@ export default class Modal extends Component<ModalProps, ModalState> {
                     toValue: 0,
                     duration: this.properties.hideContentDuration,
                     easing: this.properties.easingOut,
-                    useNativeDriver: false,
+                    useNativeDriver: this.properties.exitUseNativeDriver,
                 }),
                 Animated.timing(this.overlayAnimation, {
                     toValue: 0,
                     duration: this.properties.hideOverlayDuration,
-                    useNativeDriver: false,
+                    useNativeDriver: this.properties.exitUseNativeDriver,
                 }),
             ];
 
